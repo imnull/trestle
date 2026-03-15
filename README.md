@@ -211,6 +211,45 @@ RUST_LOG=debug cargo run --bin trestle
 cargo run --bin trestle-server
 ```
 
+## 发布
+
+项目使用 GitHub Actions 自动构建多平台版本：
+
+### 支持的平台
+
+| 平台 | 架构 | 文件格式 |
+|------|------|----------|
+| **Linux** | x86_64 | tar.gz |
+| **Windows** | x86_64 | zip |
+| **macOS** | x86_64 (Intel) | dmg / zip |
+| **macOS** | ARM64 (Apple Silicon) | dmg / zip |
+| **macOS** | Universal (Intel + ARM) | dmg / zip ⭐ 推荐 |
+
+### 发布流程
+
+```bash
+# 1. 更新版本号
+vim Cargo.toml  # 修改 version = "0.2.0"
+
+# 2. 创建 tag
+git tag v0.2.0
+git push origin v0.2.0
+
+# 3. 等待 CI 构建完成
+# 访问 https://github.com/imnull/trestle/actions 查看进度
+
+# 4. 发布完成！
+# 在 https://github.com/imnull/trestle/releases 下载
+```
+
+### macOS 通用版本
+
+**Universal Binary** 同时支持 Intel 和 Apple Silicon Mac，推荐分发此版本：
+
+- 单个 `.dmg` 文件，适用于所有 Mac
+- 自动检测 CPU 架构，无需用户选择
+- 文件稍大（约 30MB），但兼容性最好
+
 ## 许可证
 
 MIT
