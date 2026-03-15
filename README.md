@@ -26,10 +26,29 @@ AI 代理管理工具 — 一个界面管理所有 AI 编程助手
 
 ## 快速开始
 
-### 1. 构建服务端
+### 一键启动（推荐）
 
 ```bash
-cargo build --release -p trestle-server
+# 构建所有组件
+cargo build --release
+
+# 一键启动 - 自动启动服务并打开界面
+./target/release/trestle
+```
+
+就这么简单！应用会：
+1. 自动启动后端服务器
+2. 打开图形界面
+3. 退出时自动清理服务
+
+### 高级用法
+
+```bash
+# 只启动服务端（无界面）
+./target/release/trestle-server
+
+# 测试 API
+curl http://127.0.0.1:31415/api/status
 ```
 
 ### 2. 配置
