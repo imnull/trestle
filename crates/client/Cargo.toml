@@ -1,0 +1,23 @@
+[package]
+name = "trestle-client"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "trestle"
+path = "src/main.rs"
+
+[dependencies]
+trestle-core = { path = "../core" }
+
+tokio.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+
+# GUI
+eframe.workspace = true
+egui.workspace = true
+egui_extras.workspace = true
