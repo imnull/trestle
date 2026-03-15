@@ -2,10 +2,10 @@
 
 use crate::state::AppState;
 use axum::response::{IntoResponse, sse::{Event, KeepAlive, Sse}};
-use futures::stream::{Stream, StreamExt};
+use futures::stream::StreamExt;
 use std::sync::Arc;
 use std::time::Instant;
-use trestle_core::{ChatCompletionRequest, ChatCompletionResponse, TrestleError};
+use trestle_core::{ChatCompletionRequest, ChatCompletionResponse, TrestleError, RequestLog};
 
 /// 非流式聊天补全
 pub async fn chat_completion(
@@ -14,16 +14,15 @@ pub async fn chat_completion(
 ) -> Result<ChatCompletionResponse, TrestleError> {
     let start = Instant::now();
 
-    // 1. 路由匹配
+    // 路由匹配
     let (provider, model) = match_route(&state, &req.model)?;
-
     tracing::info!("Route: {} -> {} ({})", req.model, provider.name, model);
 
-    // 2. 构建上游请求
+    // 构建上游请求
     let mut upstream_req = req.clone();
     upstream_req.model = model.clone();
 
-    // 3. 发送请求
+    // 发送请求
     let client = &state.http_client;
     let resp = client
         .post(format!("{}/chat/completions", provider.base_url))
@@ -33,7 +32,6 @@ pub async fn chat_completion(
         .await
         .map_err(|e| TrestleError::Upstream(e.to_string()))?;
 
-    // 4. 处理响应
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
@@ -45,13 +43,13 @@ pub async fn chat_completion(
         .await
         .map_err(|e| TrestleError::Upstream(e.to_string()))?;
 
-    // 5. 更新统计
+    // 更新统计
     if let Some(usage) = &completion.usage {
         state.add_tokens(usage.total_tokens as u64);
     }
 
-    // 6. 记录日志
-    let log = trestle_core::RequestLog {
+    // 记录日志
+    state.add_log(RequestLog {
         id: uuid::Uuid::new_v4().to_string(),
         timestamp: chrono::Utc::now(),
         method: "POST".to_string(),
@@ -61,8 +59,7 @@ pub async fn chat_completion(
         latency_ms: start.elapsed().as_millis() as u64,
         prompt_tokens: completion.usage.as_ref().map(|u| u.prompt_tokens),
         completion_tokens: completion.usage.as_ref().map(|u| u.completion_tokens),
-    };
-    state.add_log(log);
+    });
 
     Ok(completion)
 }
@@ -72,17 +69,13 @@ pub async fn stream_chat_completion(
     state: &Arc<AppState>,
     req: ChatCompletionRequest,
 ) -> Result<impl IntoResponse, TrestleError> {
-    // 1. 路由匹配
     let (provider, model) = match_route(&state, &req.model)?;
-
     tracing::info!("Stream route: {} -> {} ({})", req.model, provider.name, model);
 
-    // 2. 构建上游请求
     let mut upstream_req = req.clone();
     upstream_req.model = model.clone();
     upstream_req.stream = Some(true);
 
-    // 3. 发送请求
     let client = &state.http_client;
     let resp = client
         .post(format!("{}/chat/completions", provider.base_url))
@@ -98,31 +91,23 @@ pub async fn stream_chat_completion(
         return Err(TrestleError::Upstream(format!("HTTP {}: {}", status, body)));
     }
 
-    // 4. 流式转发
     let stream = resp.bytes_stream();
-
     let event_stream = stream
         .map(|result| result.map_err(axum::Error::new))
-        .flat_map(|chunk_result| {
-            match chunk_result {
-                Ok(bytes) => {
-                    let text = String::from_utf8_lossy(&bytes);
-                    let events: Vec<Result<Event, axum::Error>> = text
-                        .lines()
-                        .filter(|line| line.starts_with("data: "))
-                        .map(|line| {
-                            let data = &line[6..];
-                            if data == "[DONE]" {
-                                Ok(Event::default().data("[DONE]"))
-                            } else {
-                                Ok(Event::default().data(data))
-                            }
-                        })
-                        .collect();
-                    futures::stream::iter(events)
-                }
-                Err(e) => futures::stream::iter(vec![Err(e)]),
+        .flat_map(|chunk_result| match chunk_result {
+            Ok(bytes) => {
+                let text = String::from_utf8_lossy(&bytes);
+                let events: Vec<Result<Event, axum::Error>> = text
+                    .lines()
+                    .filter(|line| line.starts_with("data: "))
+                    .map(|line| {
+                        let data = &line[6..];
+                        Ok(Event::default().data(data))
+                    })
+                    .collect();
+                futures::stream::iter(events)
             }
+            Err(e) => futures::stream::iter(vec![Err(e)]),
         });
 
     Ok(Sse::new(event_stream).keep_alive(KeepAlive::default()))
@@ -133,15 +118,19 @@ fn match_route(state: &AppState, model: &str) -> Result<(trestle_core::Provider,
     let routes = state.routes.read().unwrap();
     let providers = state.providers.read().unwrap();
 
-    // 按优先级排序的路由
-    let mut matched_routes: Vec<_> = routes.iter()
+    // 检查是否有配置
+    if providers.is_empty() {
+        return Err(TrestleError::Route("No providers configured. Please create providers.toml".to_string()));
+    }
+
+    // 按优先级匹配路由
+    let mut matched: Vec<_> = routes.iter()
         .filter(|r| matches_pattern(&r.pattern, model))
         .collect();
-    matched_routes.sort_by_key(|r| r.priority);
+    matched.sort_by_key(|r| r.priority);
 
-    if let Some(route) = matched_routes.first() {
-        // 找到对应的服务商
-        if let Some(provider) = providers.iter().find(|p| p.name == route.provider) {
+    if let Some(route) = matched.first() {
+        if let Some(provider) = providers.iter().find(|p| p.name == route.provider && p.enabled) {
             let target_model = route.model.as_ref()
                 .map(|m| m.replace("${model}", model))
                 .unwrap_or_else(|| model.to_string());
@@ -150,28 +139,18 @@ fn match_route(state: &AppState, model: &str) -> Result<(trestle_core::Provider,
     }
 
     // 默认: 使用第一个启用的服务商
-    if let Some(provider) = providers.iter().find(|p| p.enabled) {
-        return Ok((provider.clone(), model.to_string()));
-    }
-
-    Err(TrestleError::Route(format!("No provider found for model: {}", model)))
+    providers.iter()
+        .find(|p| p.enabled)
+        .map(|p| (p.clone(), model.to_string()))
+        .ok_or_else(|| TrestleError::Route("No enabled providers".to_string()))
 }
 
 /// 通配符匹配
 fn matches_pattern(pattern: &str, value: &str) -> bool {
-    if pattern == "*" {
-        return true;
+    match pattern {
+        "*" => true,
+        p if p.ends_with('*') => value.starts_with(&p[..p.len()-1]),
+        p if p.starts_with('*') => value.ends_with(&p[1..]),
+        p => p == value,
     }
-
-    if pattern.ends_with('*') {
-        let prefix = &pattern[..pattern.len()-1];
-        return value.starts_with(prefix);
-    }
-
-    if pattern.starts_with('*') {
-        let suffix = &pattern[1..];
-        return value.ends_with(suffix);
-    }
-
-    pattern == value
 }

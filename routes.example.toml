@@ -1,0 +1,31 @@
+# 路由规则示例
+
+[[routes]]
+pattern = "gpt-4*"
+provider = "openai"
+model = "gpt-4-turbo"
+priority = 1
+
+[[routes]]
+pattern = "gpt-3.5*"
+provider = "openai"
+model = "gpt-3.5-turbo"
+priority = 1
+
+[[routes]]
+pattern = "claude-*"
+provider = "anthropic"
+model = "claude-3-5-sonnet-20241022"
+priority = 1
+
+[[routes]]
+pattern = "local-*"
+provider = "ollama"
+model = "${model}"
+priority = 2
+
+[[routes]]
+pattern = "*"
+provider = "openai"
+model = "gpt-4o"
+priority = 99

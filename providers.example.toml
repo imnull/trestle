@@ -1,0 +1,21 @@
+# 服务商配置示例
+
+[[providers]]
+name = "openai"
+type = "openai"
+base_url = "https://api.openai.com/v1"
+api_key = "sk-your-key-here"
+enabled = true
+
+[[providers]]
+name = "anthropic"
+type = "anthropic"
+base_url = "https://api.anthropic.com/v1"
+api_key = "sk-ant-your-key-here"
+enabled = true
+
+[[providers]]
+name = "ollama"
+type = "openai-compatible"
+base_url = "http://localhost:11434/v1"
+enabled = true

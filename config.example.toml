@@ -1,0 +1,15 @@
+# Trestle 配置示例
+
+[server]
+host = "localhost"
+port = 31415
+
+[ui]
+theme = "system"
+language = "zh-CN"
+auto_start = true
+minimize_to_tray = true
+
+[logging]
+level = "debug"
+retention_days = 7

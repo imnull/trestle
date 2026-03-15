@@ -17,15 +17,23 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(config: Config) -> anyhow::Result<Self> {
+    pub fn new(
+        config: Config,
+        providers: Vec<Provider>,
+        routes: Vec<Route>,
+    ) -> anyhow::Result<Self> {
         let http_client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(120))
             .build()?;
 
+        // 打印已加载的配置
+        tracing::info!("Providers loaded: {:?}", providers.iter().map(|p| &p.name).collect::<Vec<_>>());
+        tracing::info!("Routes loaded: {} rules", routes.len());
+
         Ok(Self {
             config: RwLock::new(config),
-            providers: RwLock::new(Vec::new()),
-            routes: RwLock::new(Vec::new()),
+            providers: RwLock::new(providers),
+            routes: RwLock::new(routes),
             logs: RwLock::new(Vec::new()),
             start_time: Instant::now(),
             total_requests: AtomicU64::new(0),
