@@ -10,50 +10,27 @@ AI 代理管理工具 — 一个界面管理所有 AI 编程助手
 - 🛤️ **灵活路由** — 按需选择模型
 - 🔒 **本地运行** — 隐私安全，数据不出机器
 - 📊 **实时监控** — 请求统计、日志查看
-
-## 架构
-
-```
-┌─────────────┐        ┌─────────────────┐
-│   Client    │  HTTP  │     Server      │
-│  (egui GUI) │ ◄────► │  (Axum Proxy)   │
-│             │ :31415 │                 │
-└─────────────┘        └─────────────────┘
-                               │
-                               ▼
-                        上游 AI 服务
-```
+- 🎯 **一键启动** — Server 自动启动， 无需手动管理
 
 ## 快速开始
 
-### 一键启动（推荐）
+### 枇方式一：启动应用
 
 ```bash
-# 构建所有组件
-cargo build --release
-
-# 一键启动 - 自动启动服务并打开界面
-./target/release/trestle
+./trestle  # 自动启动 Server + 打开 GUI
 ```
 
-就这么简单！应用会：
-1. 自动启动后端服务器
-2. 打开图形界面
-3. 退出时自动清理服务
+**就是这么简单！** 
 
-### 高级用法
+### 方式二、只启动 Server（高级用户/无头环境）
 
 ```bash
-# 只启动服务端（无界面）
-./target/release/trestle-server
-
-# 测试 API
-curl http://127.0.0.1:31415/api/status
+./trestle-server  # 只启动服务端
 ```
 
-### 2. 配置
+### 配置
 
-复制示例配置到配置目录：
+1. **复制示例配置到配置目录**：
 
 ```bash
 mkdir -p ~/.config/trestle
@@ -62,42 +39,57 @@ cp providers.example.toml ~/.config/trestle/providers.toml
 cp routes.example.toml ~/.config/trestle/routes.toml
 ```
 
-编辑 `providers.toml` 填入你的 API Key：
+2. **编辑 `providers.toml` 填入你的 API Key：
 
-```toml
+```tom
 [[providers]]
 name = "openai"
 type = "openai"
 base_url = "https://api.openai.com/v1"
 api_key = "sk-your-actual-key"  # 替换为真实 Key
 enabled = true
+
+[[providers]]
+name = "anthropic"
+type = "anthropic"
+base_url = "https://api.anthropic.com/v1"
+api_key = "sk-ant-your-actual-key"  # 替换为真实 Key
+enabled = true
+
+[[providers]]
+name = "ollama"
+type = "openai-compatible"
+base_url = "http://localhost:11434/v1"
+enabled = true
 ```
 
-### 3. 启动服务
+3. **启动应用**
 
 ```bash
-./target/release/trestle-server
+./trestle
 ```
 
-### 4. 测试
+GUI 会自动打开，连接到 Server。
 
-```bash
-# 查看状态
-curl http://localhost:31415/api/status
+## 架构
 
-# 查看 providers
-curl http://localhost:31415/api/providers
-
-# 查看 routes
-curl http://localhost:31415/api/routes
+```
+┌─────────────┐        ┌─────────────────┐
+│   Client    │  HTTP  │     Server      │
+│  (egui GUI) │ ◄────► │  (Axum Proxy)   │
+│             │  :31415 │                 │
+└─────────────┘        └─────────────────┘
+                               │
+                               ▼
+                        上游 AI 服务
 ```
 
-### 5. 使用代理
+## 使用代理
 
 将你的 AI 工具配置为使用 Trestle：
 
 ```bash
-# OpenAI SDK
+# Cursor / Continue / Aider
 export OPENAI_API_BASE=http://localhost:31415/v1
 export OPENAI_API_KEY=any-key  # 会被代理忽略
 
@@ -112,7 +104,7 @@ client = OpenAI(
 
 ### config.toml
 
-```toml
+```tom
 [server]
 host = "127.0.0.1"
 port = 31415
@@ -128,7 +120,7 @@ retention_days = 7
 
 ### providers.toml
 
-```toml
+```om
 [[providers]]
 name = "openai"
 type = "openai"
@@ -152,7 +144,7 @@ enabled = true
 
 ### routes.toml
 
-```toml
+```om
 [[routes]]
 pattern = "gpt-4*"
 provider = "openai"
@@ -210,13 +202,13 @@ trestle/
 
 ```bash
 # 开发模式
-cargo run --bin trestle-server
+cargo run --bin trestle
 
 # 启用日志
-RUST_LOG=debug cargo run --bin trestle-server
+RUST_LOG=debug cargo run --bin trestle
 
-# 构建 GUI 客户端
-cargo run --bin trestle
+# 只启动 Server
+cargo run --bin trestle-server
 ```
 
 ## 许可证

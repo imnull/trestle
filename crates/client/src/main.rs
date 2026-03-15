@@ -5,7 +5,7 @@ mod pages;
 mod api;
 
 use std::process::{Child, Command};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 static SERVER_PROCESS: once_cell::sync::Lazy<Mutex<Option<Child>>> = 
     once_cell::sync::Lazy::new(|| Mutex::new(None));
