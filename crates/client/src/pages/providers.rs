@@ -2,10 +2,12 @@
 
 use eframe::egui::{self, Color32, RichText};
 use crate::api::ApiClient;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Default)]
 pub struct ProvidersPage {
-    providers: Vec<crate::api::Provider>,
+    providers: Arc<Mutex<Vec<crate::api::Provider>>>,
+    loaded: bool,
     add_dialog_open: bool,
     new_provider: NewProvider,
 }
@@ -20,13 +22,10 @@ struct NewProvider {
 
 impl ProvidersPage {
     pub fn show(&mut self, ui: &mut egui::Ui, api: &ApiClient) {
-        // 刷新服务商列表
-        if self.providers.is_empty() {
-            if let Ok(rt) = tokio::runtime::Runtime::new() {
-                if let Ok(providers) = rt.block_on(api.get_providers()) {
-                    self.providers = providers;
-                }
-            }
+        // 首次加载
+        if !self.loaded {
+            self.load_providers(api);
+            self.loaded = true;
         }
 
         ui.vertical(|ui| {
@@ -38,22 +37,27 @@ impl ProvidersPage {
                         self.add_dialog_open = true;
                     }
                     if ui.button("🔄 刷新").clicked() {
-                        self.providers.clear();
+                        self.loaded = false;
                     }
                 });
             });
             ui.add_space(20.0);
 
             // 服务商列表
+            let providers = self.providers.lock().unwrap().clone();
             egui::ScrollArea::vertical().show(ui, |ui| {
-                for provider in &self.providers {
+                for provider in &providers {
                     provider_card(ui, provider);
                     ui.add_space(10.0);
                 }
 
-                if self.providers.is_empty() {
+                if providers.is_empty() {
                     ui.centered_and_justified(|ui| {
-                        ui.label(RichText::new("暂无服务商，点击上方按钮添加").color(Color32::GRAY));
+                        ui.vertical(|ui| {
+                            ui.label(RichText::new("暂无服务商").color(Color32::GRAY));
+                            ui.add_space(10.0);
+                            ui.label(RichText::new("点击上方按钮添加").color(Color32::GRAY));
+                        });
                     });
                 }
             });
@@ -63,6 +67,19 @@ impl ProvidersPage {
         if self.add_dialog_open {
             self.show_add_dialog(ui);
         }
+    }
+
+    fn load_providers(&mut self, api: &ApiClient) {
+        let providers = self.providers.clone();
+        let api = api.clone();
+        
+        std::thread::spawn(move || {
+            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                if let Ok(data) = rt.block_on(api.get::<Vec<crate::api::Provider>>("/api/providers")) {
+                    *providers.lock().unwrap() = data;
+                }
+            }
+        });
     }
 
     fn show_add_dialog(&mut self, ui: &mut egui::Ui) {
@@ -81,7 +98,7 @@ impl ProvidersPage {
                         ui.end_row();
 
                         ui.label("类型:");
-                        egui::ComboBox::from_label("")
+                        egui::ComboBox::from_id_salt("provider_type")
                             .selected_text(&self.new_provider.provider_type)
                             .show_ui(ui, |ui| {
                                 ui.selectable_value(&mut self.new_provider.provider_type, "openai".to_string(), "OpenAI");
@@ -103,10 +120,12 @@ impl ProvidersPage {
                 ui.horizontal(|ui| {
                     if ui.button("取消").clicked() {
                         self.add_dialog_open = false;
+                        self.new_provider = NewProvider::default();
                     }
                     if ui.button("保存").clicked() {
-                        // TODO: 保存逻辑
+                        // TODO: 调用 API 保存
                         self.add_dialog_open = false;
+                        self.new_provider = NewProvider::default();
                     }
                 });
             });
@@ -132,7 +151,7 @@ fn provider_card(ui: &mut egui::Ui, provider: &crate::api::Provider) {
             ui.add_space(5.0);
             ui.horizontal(|ui| {
                 if provider.enabled {
-                    ui.label(RichText::new("● 正常").color(Color32::from_rgb(0, 200, 100)).size(12.0));
+                    ui.label(RichText::new("● 启用").color(Color32::from_rgb(0, 200, 100)).size(12.0));
                 } else {
                     ui.label(RichText::new("○ 已禁用").color(Color32::GRAY).size(12.0));
                 }

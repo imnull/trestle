@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! API 客户端
 
 use reqwest::Client;
@@ -26,15 +28,6 @@ impl ApiClient {
         Ok(data)
     }
 
-    pub async fn post<T: DeserializeOwned, B: serde::Serialize>(&self, path: &str, body: &B) -> anyhow::Result<T> {
-        let url = format!("{}{}", self.base_url, path);
-        let resp = self.client.post(&url).json(body).send().await?;
-        let data = resp.json().await?;
-        Ok(data)
-    }
-
-    // === 具体 API ===
-
     pub async fn get_status(&self) -> anyhow::Result<ServerStatus> {
         self.get("/api/status").await
     }
@@ -52,14 +45,23 @@ impl ApiClient {
     }
 }
 
-// === 类型定义 (从 core 复制，避免循环依赖) ===
-
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ServerStatus {
     pub uptime_secs: u64,
     pub total_requests: u64,
     pub total_tokens: u64,
+    #[allow(dead_code)]
     pub active_connections: u32,
+    pub providers: Vec<ProviderStatus>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ProviderStatus {
+    pub name: String,
+    pub healthy: bool,
+    pub latency_ms: Option<u64>,
+    #[allow(dead_code)]
+    pub last_check: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
