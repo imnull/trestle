@@ -1,0 +1,18 @@
+target/
+**/*.rs.bk
+*.pdb
+
+# macOS
+.DS_Store
+*.dmg
+
+# Windows
+*.exe
+*.dll
+
+# Linux
+*.AppImage
+
+# IDE
+.vscode/
+.idea/
