@@ -7,7 +7,7 @@ use std::path::PathBuf;
 pub const DEFAULT_PORT: u16 = 31415;
 
 /// 默认主机
-pub const DEFAULT_HOST: &str = "localhost";
+pub const DEFAULT_HOST: &str = "127.0.0.1";
 
 /// 主配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
