@@ -59,7 +59,7 @@ impl ServerRuntime {
             .route("/api/config/save", post(crud::save_config))
             // Provider CRUD
             .route("/api/providers", get(handlers::list_providers).post(crud::create_provider))
-            .route("/api/providers/:name", put(crud::update_provider).delete(crud::delete_provider))
+            .route("/api/providers/{name}", put(crud::update_provider).delete(crud::delete_provider))
             // Route CRUD
             .route("/api/routes", get(handlers::list_routes).post(crud::create_route))
             .route("/api/routes/{*pattern}", put(crud::update_route).delete(crud::delete_route))
