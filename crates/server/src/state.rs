@@ -1,9 +1,19 @@
 //! 应用状态
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
 use std::time::Instant;
 use trestle_core::{Config, Provider, RequestLog, Route};
+use chrono::{DateTime, Utc};
+
+/// 健康检查信息
+#[derive(Debug, Clone)]
+pub struct HealthInfo {
+    pub healthy: bool,
+    pub latency_ms: Option<u64>,
+    pub last_check: Option<DateTime<Utc>>,
+}
 
 pub struct AppState {
     pub config: RwLock<Config>,
@@ -14,6 +24,7 @@ pub struct AppState {
     pub total_requests: AtomicU64,
     pub total_tokens: AtomicU64,
     pub http_client: reqwest::Client,
+    pub health_cache: RwLock<HashMap<String, HealthInfo>>,
 }
 
 impl AppState {
@@ -26,7 +37,6 @@ impl AppState {
             .timeout(std::time::Duration::from_secs(120))
             .build()?;
 
-        // 打印已加载的配置
         tracing::info!("Providers loaded: {:?}", providers.iter().map(|p| &p.name).collect::<Vec<_>>());
         tracing::info!("Routes loaded: {} rules", routes.len());
 
@@ -39,6 +49,7 @@ impl AppState {
             total_requests: AtomicU64::new(0),
             total_tokens: AtomicU64::new(0),
             http_client,
+            health_cache: RwLock::new(HashMap::new()),
         })
     }
 
@@ -53,9 +64,13 @@ impl AppState {
     pub fn add_log(&self, log: RequestLog) {
         let mut logs = self.logs.write().unwrap();
         logs.push(log);
-        // 只保留最近 10000 条
         if logs.len() > 10000 {
             logs.drain(0..1000);
         }
+    }
+
+    pub fn update_health(&self, name: String, info: HealthInfo) {
+        let mut cache = self.health_cache.write().unwrap();
+        cache.insert(name, info);
     }
 }

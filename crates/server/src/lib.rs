@@ -54,6 +54,7 @@ impl ServerRuntime {
             .route("/v1/messages", post(handlers::anthropic_messages))
             // 状态和配置 API
             .route("/api/status", get(handlers::get_status))
+            .route("/api/health-check", post(handlers::health_check))
             .route("/api/config", get(handlers::get_config).put(handlers::update_config))
             .route("/api/config/save", post(crud::save_config))
             // Provider CRUD
