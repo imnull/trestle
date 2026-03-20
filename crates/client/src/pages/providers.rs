@@ -70,16 +70,14 @@ impl ProvidersPage {
     }
 
     fn load_providers(&mut self, api: &ApiClient) {
-        let providers = self.providers.clone();
-        let api = api.clone();
-        
-        std::thread::spawn(move || {
-            if let Ok(rt) = tokio::runtime::Runtime::new() {
-                if let Ok(data) = rt.block_on(api.get::<Vec<crate::api::Provider>>("/api/providers")) {
-                    *providers.lock().unwrap() = data;
-                }
+        match api.get::<Vec<crate::api::Provider>>("/api/providers") {
+            Ok(data) => {
+                *self.providers.lock().unwrap() = data;
             }
-        });
+            Err(e) => {
+                eprintln!("Failed to load providers: {}", e);
+            }
+        }
     }
 
     fn show_add_dialog(&mut self, ui: &mut egui::Ui) {

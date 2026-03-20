@@ -73,16 +73,14 @@ impl LogsPage {
     }
 
     fn load_logs(&mut self, api: &ApiClient) {
-        let logs = self.logs.clone();
-        let api = api.clone();
-        
-        std::thread::spawn(move || {
-            if let Ok(rt) = tokio::runtime::Runtime::new() {
-                if let Ok(data) = rt.block_on(api.get::<Vec<crate::api::RequestLog>>("/api/logs")) {
-                    *logs.lock().unwrap() = data;
-                }
+        match api.get::<Vec<crate::api::RequestLog>>("/api/logs") {
+            Ok(data) => {
+                *self.logs.lock().unwrap() = data;
             }
-        });
+            Err(e) => {
+                eprintln!("Failed to load logs: {}", e);
+            }
+        }
     }
 }
 

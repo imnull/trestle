@@ -2,7 +2,7 @@
 
 //! API 客户端
 
-use reqwest::Client;
+use reqwest::blocking::Client;
 use serde::de::DeserializeOwned;
 
 #[derive(Debug, Clone)]
@@ -14,34 +14,34 @@ pub struct ApiClient {
 impl ApiClient {
     pub fn new(base_url: String) -> Self {
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
+            .timeout(std::time::Duration::from_secs(5))
             .build()
             .unwrap();
 
         Self { base_url, client }
     }
 
-    pub async fn get<T: DeserializeOwned>(&self, path: &str) -> anyhow::Result<T> {
+    pub fn get<T: DeserializeOwned>(&self, path: &str) -> anyhow::Result<T> {
         let url = format!("{}{}", self.base_url, path);
-        let resp = self.client.get(&url).send().await?;
-        let data = resp.json().await?;
+        let resp = self.client.get(&url).send()?;
+        let data = resp.json()?;
         Ok(data)
     }
 
-    pub async fn get_status(&self) -> anyhow::Result<ServerStatus> {
-        self.get("/api/status").await
+    pub fn get_status(&self) -> anyhow::Result<ServerStatus> {
+        self.get("/api/status")
     }
 
-    pub async fn get_providers(&self) -> anyhow::Result<Vec<Provider>> {
-        self.get("/api/providers").await
+    pub fn get_providers(&self) -> anyhow::Result<Vec<Provider>> {
+        self.get("/api/providers")
     }
 
-    pub async fn get_routes(&self) -> anyhow::Result<Vec<Route>> {
-        self.get("/api/routes").await
+    pub fn get_routes(&self) -> anyhow::Result<Vec<Route>> {
+        self.get("/api/routes")
     }
 
-    pub async fn get_logs(&self) -> anyhow::Result<Vec<RequestLog>> {
-        self.get("/api/logs").await
+    pub fn get_logs(&self) -> anyhow::Result<Vec<RequestLog>> {
+        self.get("/api/logs")
     }
 }
 

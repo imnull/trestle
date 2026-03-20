@@ -61,16 +61,14 @@ impl RoutesPage {
     }
 
     fn load_routes(&mut self, api: &ApiClient) {
-        let routes = self.routes.clone();
-        let api = api.clone();
-        
-        std::thread::spawn(move || {
-            if let Ok(rt) = tokio::runtime::Runtime::new() {
-                if let Ok(data) = rt.block_on(api.get::<Vec<crate::api::Route>>("/api/routes")) {
-                    *routes.lock().unwrap() = data;
-                }
+        match api.get::<Vec<crate::api::Route>>("/api/routes") {
+            Ok(data) => {
+                *self.routes.lock().unwrap() = data;
             }
-        });
+            Err(e) => {
+                eprintln!("Failed to load routes: {}", e);
+            }
+        }
     }
 }
 

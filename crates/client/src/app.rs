@@ -114,26 +114,18 @@ impl TrestleApp {
         }
         self.last_update = Instant::now();
 
-        let api = self.api.clone();
-        let status = self.server_status.clone();
-
-        // 异步获取状态
-        std::thread::spawn(move || {
-            if let Ok(rt) = tokio::runtime::Runtime::new() {
-                match rt.block_on(api.get::<ServerStatus>("/api/status")) {
-                    Ok(s) => {
-                        *status.lock().unwrap() = Some(s);
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to get status: {}", e);
-                        *status.lock().unwrap() = None;
-                    }
-                }
+        // 使用阻塞 API 获取状态
+        match self.api.get::<ServerStatus>("/api/status") {
+            Ok(s) => {
+                *self.server_status.lock().unwrap() = Some(s);
+                self.connected = true;
             }
-        });
-
-        // 检查连接状态
-        self.connected = self.server_status.lock().unwrap().is_some();
+            Err(e) => {
+                eprintln!("Failed to get status: {}", e);
+                *self.server_status.lock().unwrap() = None;
+                self.connected = false;
+            }
+        }
     }
 }
 
