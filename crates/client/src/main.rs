@@ -132,8 +132,6 @@ fn create_tray() -> Result<TrayItem, tray_item::TIError> {
         tracing::info!("Server status: running");
     })?;
     
-    tray.add_separator()?;
-    
     tray.add_menu_item("退出", || {
         tracing::info!("Quit requested from tray");
         SHOULD_EXIT.store(true, Ordering::Relaxed);
