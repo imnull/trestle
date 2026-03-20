@@ -4,9 +4,10 @@
 mod handlers;
 mod proxy;
 mod state;
+mod crud;
 
 use axum::{
-    routing::{get, post},
+    routing::{delete, get, post, put},
     Router,
 };
 use std::net::SocketAddr;
@@ -47,13 +48,21 @@ impl ServerRuntime {
 
         // 构建路由
         let app = Router::new()
+            // OpenAI/Anthropic 兼容 API
             .route("/v1/chat/completions", post(handlers::chat_completions))
             .route("/v1/models", get(handlers::list_models))
             .route("/v1/messages", post(handlers::anthropic_messages))
+            // 状态和配置 API
             .route("/api/status", get(handlers::get_status))
             .route("/api/config", get(handlers::get_config).put(handlers::update_config))
-            .route("/api/providers", get(handlers::list_providers))
-            .route("/api/routes", get(handlers::list_routes))
+            .route("/api/config/save", post(crud::save_config))
+            // Provider CRUD
+            .route("/api/providers", get(handlers::list_providers).post(crud::create_provider))
+            .route("/api/providers/:name", put(crud::update_provider).delete(crud::delete_provider))
+            // Route CRUD
+            .route("/api/routes", get(handlers::list_routes).post(crud::create_route))
+            .route("/api/routes/{*pattern}", put(crud::update_route).delete(crud::delete_route))
+            // 日志
             .route("/api/logs", get(handlers::get_logs))
             .layer(CorsLayer::permissive())
             .layer(TraceLayer::new_for_http())

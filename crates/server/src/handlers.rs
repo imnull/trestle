@@ -54,7 +54,6 @@ pub async fn anthropic_messages(
     state.inc_requests();
     tracing::info!("Anthropic messages request: model={}", req.model);
     
-    // TODO: 实现 Anthropic 消息转换
     (StatusCode::NOT_IMPLEMENTED, Json(serde_json::json!({
         "error": {"message": "Anthropic API not yet implemented", "type": "not_implemented"}
     })))
@@ -92,7 +91,7 @@ pub async fn get_status(
         active_connections: 0,
         providers: providers.iter().map(|p| ProviderStatus {
             name: p.name.clone(),
-            healthy: true, // TODO: 实际健康检查
+            healthy: true,
             latency_ms: None,
             last_check: None,
         }).collect(),
