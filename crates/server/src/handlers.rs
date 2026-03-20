@@ -54,9 +54,15 @@ pub async fn anthropic_messages(
     state.inc_requests();
     tracing::info!("Anthropic messages request: model={}", req.model);
     
-    (StatusCode::NOT_IMPLEMENTED, Json(serde_json::json!({
-        "error": {"message": "Anthropic API not yet implemented", "type": "not_implemented"}
-    })))
+    match proxy::anthropic_messages(&state, req).await {
+        Ok(resp) => (StatusCode::OK, Json(resp)).into_response(),
+        Err(e) => {
+            tracing::error!("Anthropic request error: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
+                "error": {"type": "internal_error", "message": e.to_string()}
+            }))).into_response()
+        }
+    }
 }
 
 /// GET /v1/models
