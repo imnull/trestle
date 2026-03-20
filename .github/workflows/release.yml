@@ -10,7 +10,6 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Linux 构建
   build-linux:
     runs-on: ubuntu-latest
     steps:
@@ -19,6 +18,11 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+      
       - name: Build
         run: cargo build --release
       
@@ -26,9 +30,10 @@ jobs:
         run: |
           mkdir -p release
           cp target/release/trestle release/
-          cp target/release/trestle-server release/
-          cp *.example.toml release/
-          tar -czf trestle-linux-x64.tar.gz -C release .
+          cp config.example.toml release/ || true
+          cp providers.example.toml release/ || true
+          cp routes.example.toml release/ || true
+          cd release && tar -czvf ../trestle-linux-x64.tar.gz .
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -36,7 +41,6 @@ jobs:
           name: trestle-linux-x64
           path: trestle-linux-x64.tar.gz
 
-  # Windows 构建
   build-windows:
     runs-on: windows-latest
     steps:
@@ -52,8 +56,11 @@ jobs:
         run: |
           mkdir release
           copy target\release\trestle.exe release\
-          copy target\release\trestle-server.exe release\
-          7z a trestle-windows-x64.zip release/*
+          copy config.example.toml release\ 2>nul || true
+          copy providers.example.toml release\ 2>nul || true
+          copy routes.example.toml release\ 2>nul || true
+          cd release
+          7z a ../trestle-windows-x64.zip .
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -61,9 +68,8 @@ jobs:
           name: trestle-windows-x64
           path: trestle-windows-x64.zip
 
-  # macOS 构建 - Intel (x86_64)
   build-macos-intel:
-    runs-on: macos-13  # Intel runner
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
       
@@ -80,68 +86,40 @@ jobs:
           mkdir -p Trestle.app/Contents/MacOS
           mkdir -p Trestle.app/Contents/Resources
           cp target/x86_64-apple-darwin/release/trestle Trestle.app/Contents/MacOS/
-          cp target/x86_64-apple-darwin/release/trestle-server Trestle.app/Contents/Resources/
           
-          # Create Info.plist
           cat > Trestle.app/Contents/Info.plist << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-              <key>CFBundleDevelopmentRegion</key>
-              <string>en</string>
               <key>CFBundleExecutable</key>
               <string>trestle</string>
               <key>CFBundleIdentifier</key>
               <string>ai.trestle.app</string>
-              <key>CFBundleInfoDictionaryVersion</key>
-              <string>6.0</string>
               <key>CFBundleName</key>
               <string>Trestle</string>
               <key>CFBundlePackageType</key>
               <string>APPL</string>
               <key>CFBundleShortVersionString</key>
-              <string>0.1.0</string>
-              <key>CFBundleVersion</key>
-              <string>1</string>
-              <key>LSMinimumSystemVersion</key>
-              <string>10.13</string>
+              <string>${GITHUB_REF_NAME#v}</string>
               <key>NSHighResolutionCapable</key>
               <true/>
           </dict>
           </plist>
           EOF
       
-      - name: Create DMG
+      - name: Create archive
         run: |
-          brew install create-dmg
-          create-dmg \
-            --volname "Trestle" \
-            --volicon "assets/icon.icns" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --app-drop-link 400 200 \
-            "Trestle-macOS-x86_64.dmg" \
-            "Trestle.app" || true
-          
-          # Fallback: just zip if dmg fails
-          if [ ! -f "Trestle-macOS-x86_64.dmg" ]; then
-            zip -r Trestle-macOS-x86_64.zip Trestle.app
-          fi
+          zip -r Trestle-macOS-x86_64.zip Trestle.app
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: trestle-macos-x86_64
-          path: |
-            Trestle-macOS-x86_64.dmg
-            Trestle-macOS-x86_64.zip
-          if-no-files-found: warn
+          path: Trestle-macOS-x86_64.zip
 
-  # macOS 构建 - Apple Silicon (aarch64)
   build-macos-arm:
-    runs-on: macos-latest  # M1 runner
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       
@@ -158,66 +136,38 @@ jobs:
           mkdir -p Trestle.app/Contents/MacOS
           mkdir -p Trestle.app/Contents/Resources
           cp target/aarch64-apple-darwin/release/trestle Trestle.app/Contents/MacOS/
-          cp target/aarch64-apple-darwin/release/trestle-server Trestle.app/Contents/Resources/
           
-          # Create Info.plist
           cat > Trestle.app/Contents/Info.plist << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-              <key>CFBundleDevelopmentRegion</key>
-              <string>en</string>
               <key>CFBundleExecutable</key>
               <string>trestle</string>
               <key>CFBundleIdentifier</key>
               <string>ai.trestle.app</string>
-              <key>CFBundleInfoDictionaryVersion</key>
-              <string>6.0</string>
               <key>CFBundleName</key>
               <string>Trestle</string>
               <key>CFBundlePackageType</key>
               <string>APPL</string>
               <key>CFBundleShortVersionString</key>
-              <string>0.1.0</string>
-              <key>CFBundleVersion</key>
-              <string>1</string>
-              <key>LSMinimumSystemVersion</key>
-              <string>11.0</string>
+              <string>${GITHUB_REF_NAME#v}</string>
               <key>NSHighResolutionCapable</key>
               <true/>
           </dict>
           </plist>
           EOF
       
-      - name: Create DMG
+      - name: Create archive
         run: |
-          brew install create-dmg
-          create-dmg \
-            --volname "Trestle" \
-            --volicon "assets/icon.icns" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --app-drop-link 400 200 \
-            "Trestle-macOS-arm64.dmg" \
-            "Trestle.app" || true
-          
-          # Fallback: just zip if dmg fails
-          if [ ! -f "Trestle-macOS-arm64.dmg" ]; then
-            zip -r Trestle-macOS-arm64.zip Trestle.app
-          fi
+          zip -r Trestle-macOS-arm64.zip Trestle.app
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: trestle-macos-arm64
-          path: |
-            Trestle-macOS-arm64.dmg
-            Trestle-macOS-arm64.zip
-          if-no-files-found: warn
+          path: Trestle-macOS-arm64.zip
 
-  # 创建 Universal Binary (Intel + Apple Silicon 合一)
   build-macos-universal:
     runs-on: macos-latest
     needs: [build-macos-intel, build-macos-arm]
@@ -229,105 +179,60 @@ jobs:
         with:
           targets: x86_64-apple-darwin,aarch64-apple-darwin
       
-      - name: Download Intel build
-        uses: actions/download-artifact@v4
-        with:
-          name: trestle-macos-x86_64
-          path: intel
-      
-      - name: Download ARM build
-        uses: actions/download-artifact@v4
-        with:
-          name: trestle-macos-arm64
-          path: arm
-      
-      - name: Build universal binary
+      - name: Build universal
         run: |
-          # Build both architectures
           cargo build --release --target x86_64-apple-darwin
           cargo build --release --target aarch64-apple-darwin
           
-          # Create universal binary
           mkdir -p universal
           lipo -create \
             target/x86_64-apple-darwin/release/trestle \
             target/aarch64-apple-darwin/release/trestle \
             -output universal/trestle
-          
-          lipo -create \
-            target/x86_64-apple-darwin/release/trestle-server \
-            target/aarch64-apple-darwin/release/trestle-server \
-            -output universal/trestle-server
       
       - name: Create app bundle
         run: |
           mkdir -p Trestle.app/Contents/MacOS
           mkdir -p Trestle.app/Contents/Resources
           cp universal/trestle Trestle.app/Contents/MacOS/
-          cp universal/trestle-server Trestle.app/Contents/Resources/
           
-          # Create Info.plist
           cat > Trestle.app/Contents/Info.plist << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-              <key>CFBundleDevelopmentRegion</key>
-              <string>en</string>
               <key>CFBundleExecutable</key>
               <string>trestle</string>
               <key>CFBundleIdentifier</key>
               <string>ai.trestle.app</string>
-              <key>CFBundleInfoDictionaryVersion</key>
-              <string>6.0</string>
               <key>CFBundleName</key>
               <string>Trestle</string>
               <key>CFBundlePackageType</key>
               <string>APPL</string>
               <key>CFBundleShortVersionString</key>
-              <string>0.1.0</string>
-              <key>CFBundleVersion</key>
-              <string>1</string>
-              <key>LSMinimumSystemVersion</key>
-              <string>10.13</string>
+              <string>${GITHUB_REF_NAME#v}</string>
               <key>NSHighResolutionCapable</key>
               <true/>
           </dict>
           </plist>
           EOF
       
-      - name: Create DMG
+      - name: Create archive
         run: |
-          brew install create-dmg || true
-          
-          # Try to create DMG, fallback to zip
-          if command -v create-dmg &> /dev/null; then
-            create-dmg \
-              --volname "Trestle" \
-              --window-pos 200 120 \
-              --window-size 600 400 \
-              --icon-size 100 \
-              --app-drop-link 400 200 \
-              "Trestle-macOS-universal.dmg" \
-              "Trestle.app" || true
-          fi
-          
-          # Fallback: create zip
           zip -r Trestle-macOS-universal.zip Trestle.app
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: trestle-macOS-universal
-          path: |
-            Trestle-macOS-universal.dmg
-            Trestle-macOS-universal.zip
+          name: trestle-macos-universal
+          path: Trestle-macOS-universal.zip
 
-  # 发布 Release
   release:
     needs: [build-linux, build-windows, build-macos-universal]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -338,12 +243,9 @@ jobs:
           files: |
             trestle-linux-x64/trestle-linux-x64.tar.gz
             trestle-windows-x64/trestle-windows-x64.zip
-            trestle-macos-x86_64/Trestle-macOS-x86_64.dmg
             trestle-macos-x86_64/Trestle-macOS-x86_64.zip
-            trestle-macos-arm64/Trestle-macOS-arm64.dmg
             trestle-macos-arm64/Trestle-macOS-arm64.zip
-            trestle-macOS-universal/Trestle-macOS-universal.dmg
-            trestle-macOS-universal/Trestle-macOS-universal.zip
+            trestle-macos-universal/Trestle-macOS-universal.zip
           draft: false
           prerelease: false
         env:
