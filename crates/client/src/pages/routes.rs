@@ -22,7 +22,7 @@ impl RoutesPage {
                 ui.label(RichText::new("路由规则").size(24.0).strong());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button("➕ 添加规则").clicked() {}
-                    if ui.button("🔄 刷新").clicked() {
+                    if ui.button("⟳ 刷新").clicked() {
                         self.loaded = false;
                     }
                 });

@@ -57,7 +57,7 @@ impl DashboardPage {
             } else {
                 ui.centered_and_justified(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(RichText::new("⚠️ 未连接到服务器").size(18.0).color(Color32::from_rgb(255, 100, 100)));
+                        ui.label(RichText::new("! 未连接到服务器").size(18.0).color(Color32::from_rgb(255, 100, 100)));
                         ui.add_space(10.0);
                         ui.label(RichText::new("请确保 trestle-server 正在运行").color(Color32::GRAY));
                         ui.add_space(5.0);
@@ -76,9 +76,9 @@ impl DashboardPage {
                 .num_columns(3)
                 .spacing([10.0, 10.0])
                 .show(ui, |ui| {
-                    if ui.button("🔄 刷新状态").clicked() {}
-                    if ui.button("📋 查看日志").clicked() {}
-                    if ui.button("⚙ 打开设置").clicked() {}
+                    if ui.button("⟳ 刷新状态").clicked() {}
+                    if ui.button("▤ 查看日志").clicked() {}
+                    if ui.button("[o] 打开设置").clicked() {}
                 });
         });
     }

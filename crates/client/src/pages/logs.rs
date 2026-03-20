@@ -28,7 +28,7 @@ impl LogsPage {
             ui.horizontal(|ui| {
                 ui.add(egui::TextEdit::singleline(&mut self.search).hint_text("搜索..."));
                 let _ = ui.button("导出 CSV");
-                if ui.button("🔄 刷新").clicked() {
+                if ui.button("⟳ 刷新").clicked() {
                     self.loaded = false;
                 }
             });

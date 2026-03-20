@@ -35,9 +35,9 @@ async fn main() -> anyhow::Result<()> {
 
     let addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port).parse()?;
 
-    tracing::info!("🚀 Trestle Server starting on http://{}", addr);
-    tracing::info!("📖 OpenAI API: POST http://{}/v1/chat/completions", addr);
-    tracing::info!("📊 Status: GET http://{}/api/status", addr);
+    tracing::info!(">> Trestle Server starting on http://{}", addr);
+    tracing::info!("[ OpenAI API: POST http://{}/v1/chat/completions", addr);
+    tracing::info!("[ Status: GET http://{}/api/status", addr);
 
     // 创建应用状态
     let state = Arc::new(AppState::new(config, providers, routes)?);
@@ -57,7 +57,7 @@ async fn main() -> anyhow::Result<()> {
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    tracing::info!("✅ Server is running!");
+    tracing::info!("OK Server is running!");
     axum::serve(listener, app).await?;
 
     Ok(())

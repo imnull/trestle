@@ -36,7 +36,7 @@ impl ProvidersPage {
                     if ui.button("➕ 添加服务商").clicked() {
                         self.add_dialog_open = true;
                     }
-                    if ui.button("🔄 刷新").clicked() {
+                    if ui.button("⟳ 刷新").clicked() {
                         self.loaded = false;
                     }
                 });

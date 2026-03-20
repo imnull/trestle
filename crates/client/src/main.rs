@@ -73,11 +73,11 @@ fn start_server() {
         .spawn()
     {
         Ok(child) => {
-            println!("✅ Server started (PID: {})", child.id());
+            println!("OK Server started (PID: {})", child.id());
             *SERVER_PROCESS.lock().unwrap() = Some(child);
         }
         Err(e) => {
-            eprintln!("❌ Failed to start server: {}", e);
+            eprintln!("ERR Failed to start server: {}", e);
             eprintln!("   Looking for: {:?}", server_path);
             eprintln!("   Server will not be available, but client will still run");
         }
@@ -90,7 +90,7 @@ fn stop_server() {
             println!("🛑 Stopping server (PID: {})...", child.id());
             let _ = child.kill();
             let _ = child.wait();
-            println!("✅ Server stopped");
+            println!("OK Server stopped");
         }
         *state = None;
     }

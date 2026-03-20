@@ -34,7 +34,10 @@ pub struct TrestleApp {
 }
 
 impl TrestleApp {
-    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // 加载中文字体
+        Self::setup_chinese_fonts(&cc.egui_ctx);
+
         Self {
             current_page: Page::default(),
             dashboard: DashboardPage::default(),
@@ -47,6 +50,61 @@ impl TrestleApp {
             last_update: Instant::now(),
             connected: false,
         }
+    }
+
+    fn setup_chinese_fonts(ctx: &egui::Context) {
+        let mut fonts = egui::FontDefinitions::default();
+
+        // 尝试加载系统中文字体
+        let chinese_fonts = [
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+            "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        ];
+
+        for font_path in &chinese_fonts {
+            if let Ok(font_data) = std::fs::read(font_path) {
+                fonts.font_data.insert(
+                    "ChineseFont".to_owned(),
+                    std::sync::Arc::new(egui::FontData::from_owned(font_data)),
+                );
+                // 将中文字体添加到所有字体的首选位置
+                for family in [&egui::FontFamily::Proportional, &egui::FontFamily::Monospace] {
+                    if let Some(keys) = fonts.families.get_mut(family) {
+                        keys.insert(0, "ChineseFont".to_owned());
+                    }
+                }
+                println!("Loaded Chinese font from: {}", font_path);
+                break;
+            }
+        }
+
+        // 加载 emoji 字体
+        let emoji_fonts = [
+            "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+            "/usr/share/fonts/truetype/noto/NotoEmoji-Regular.ttf",
+            "/usr/share/fonts/truetype/twitter-twemoji/Twemoji.ttf",
+        ];
+
+        for font_path in &emoji_fonts {
+            if let Ok(font_data) = std::fs::read(font_path) {
+                fonts.font_data.insert(
+                    "EmojiFont".to_owned(),
+                    std::sync::Arc::new(egui::FontData::from_owned(font_data)),
+                );
+                // 将 emoji 字体添加到字体族
+                for family in [&egui::FontFamily::Proportional, &egui::FontFamily::Monospace] {
+                    if let Some(keys) = fonts.families.get_mut(family) {
+                        keys.push("EmojiFont".to_owned());
+                    }
+                }
+                println!("Loaded Emoji font from: {}", font_path);
+                break;
+            }
+        }
+
+        ctx.set_fonts(fonts);
     }
 
     fn update_status(&mut self) {
@@ -96,7 +154,7 @@ impl eframe::App for TrestleApp {
                 ui.add_space(10.0);
                 ui.horizontal(|ui| {
                     ui.add_space(10.0);
-                    ui.label(RichText::new("⚡ Trestle").size(20.0).strong());
+                    ui.label(RichText::new("[Trestle]").size(20.0).strong());
                 });
                 ui.add_space(20.0);
 
@@ -138,12 +196,13 @@ impl eframe::App for TrestleApp {
 
 impl TrestleApp {
     fn show_nav(&mut self, ui: &mut egui::Ui) {
+        // 使用基本 ASCII 符号
         let nav_items = [
-            (Page::Dashboard, "📊 仪表盘"),
-            (Page::Providers, "🔌 服务商"),
-            (Page::Routes, "🛤 路由"),
-            (Page::Logs, "📜 日志"),
-            (Page::Settings, "⚙ 设置"),
+            (Page::Dashboard, "[*] 仪表盘"),
+            (Page::Providers, "[+] 服务商"),
+            (Page::Routes, "[>] 路由"),
+            (Page::Logs, "[#] 日志"),
+            (Page::Settings, "[o] 设置"),
         ];
 
         for (page, label) in nav_items {
