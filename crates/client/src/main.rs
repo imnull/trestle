@@ -21,8 +21,18 @@ fn main() -> eframe::Result<()> {
         }
     }
 
-    // 等待服务端启动
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    // 等待服务端完全启动
+    println!("Waiting for server to be ready...");
+    for i in 0..10 {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        if let Ok(resp) = reqwest::blocking::get("http://127.0.0.1:31415/api/status") {
+            if resp.status().is_success() {
+                println!("Server is ready!");
+                break;
+            }
+        }
+        println!("Attempt {} - server not ready yet", i + 1);
+    }
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

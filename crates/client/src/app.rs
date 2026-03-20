@@ -29,7 +29,7 @@ pub struct TrestleApp {
     settings: SettingsPage,
     api: ApiClient,
     server_status: Arc<Mutex<Option<ServerStatus>>>,
-    last_update: Instant,
+    last_update: Option<Instant>,
     connected: bool,
 }
 
@@ -47,7 +47,7 @@ impl TrestleApp {
             settings: SettingsPage::default(),
             api: ApiClient::new("http://127.0.0.1:31415".to_string()),
             server_status: Arc::new(Mutex::new(None)),
-            last_update: Instant::now(),
+            last_update: None,  // 首次立即执行
             connected: false,
         }
     }
@@ -108,20 +108,23 @@ impl TrestleApp {
     }
 
     fn update_status(&mut self) {
-        // 每 2 秒更新一次
-        if self.last_update.elapsed() < Duration::from_secs(2) {
-            return;
+        // 首次立即执行，之后每 2 秒更新一次
+        if let Some(last) = self.last_update {
+            if last.elapsed() < Duration::from_secs(2) {
+                return;
+            }
         }
-        self.last_update = Instant::now();
+        self.last_update = Some(Instant::now());
 
         // 使用阻塞 API 获取状态
         match self.api.get::<ServerStatus>("/api/status") {
             Ok(s) => {
+                println!("DEBUG: Got status, connected=true");
                 *self.server_status.lock().unwrap() = Some(s);
                 self.connected = true;
             }
             Err(e) => {
-                eprintln!("Failed to get status: {}", e);
+                println!("DEBUG: Failed to get status: {}", e);
                 *self.server_status.lock().unwrap() = None;
                 self.connected = false;
             }
@@ -131,6 +134,9 @@ impl TrestleApp {
 
 impl eframe::App for TrestleApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // 请求持续重绘以定期检查状态
+        ctx.request_repaint_after(std::time::Duration::from_secs(2));
+
         // 定期更新状态
         self.update_status();
 
