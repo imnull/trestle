@@ -4,24 +4,25 @@ mod app;
 mod pages;
 mod api;
 
-use std::process::{Child, Command};
 use std::sync::Mutex;
 
-static SERVER_PROCESS: once_cell::sync::Lazy<Mutex<Option<Child>>> = 
+use trestle_server::ServerRuntime;
+
+static SERVER_RUNTIME: once_cell::sync::Lazy<Mutex<Option<ServerRuntime>>> = 
     once_cell::sync::Lazy::new(|| Mutex::new(None));
 
 fn main() -> eframe::Result<()> {
-    // 启动 server
-    start_server();
-    
-    // 等待 server 启动
+    // 启动内嵌服务端
+    match start_embedded_server() {
+        Ok(url) => println!("OK Embedded server started at {}", url),
+        Err(e) => {
+            eprintln!("ERR Failed to start embedded server: {}", e);
+            eprintln!("   Client will run without server functionality");
+        }
+    }
+
+    // 等待服务端启动
     std::thread::sleep(std::time::Duration::from_millis(500));
-    
-    // 设置退出处理
-    ctrlc::set_handler(|| {
-        stop_server();
-        std::process::exit(0);
-    }).ok();
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -36,62 +37,26 @@ fn main() -> eframe::Result<()> {
         options,
         Box::new(|cc| Ok(Box::new(app::TrestleApp::new(cc)))),
     );
-    
-    // 退出时停止 server
+
+    // 退出时清理服务端
     stop_server();
-    
+
     result
 }
 
-fn start_server() {
-    let exe_path = match std::env::current_exe() {
-        Ok(p) => p,
-        Err(_) => return,
-    };
-    let exe_dir = match exe_path.parent() {
-        Some(d) => d,
-        None => return,
-    };
+fn start_embedded_server() -> anyhow::Result<String> {
+    let runtime = ServerRuntime::start()?;
+    let url = runtime.url();
     
-    // 查找 server binary
-    let server_paths = vec![
-        exe_dir.join("trestle-server"),
-        exe_dir.join("trestle-server.exe"),
-        exe_dir.join("../Resources/trestle-server"),
-        exe_dir.join("../../release/trestle-server"),
-        exe_dir.join("../../debug/trestle-server"),
-    ];
+    *SERVER_RUNTIME.lock().unwrap() = Some(runtime);
     
-    let server_path = server_paths.into_iter()
-        .find(|p| p.exists())
-        .unwrap_or_else(|| exe_dir.join("trestle-server"));
-
-    println!("Starting server from: {:?}", server_path);
-    
-    match Command::new(&server_path)
-        .env("RUST_LOG", "info")
-        .spawn()
-    {
-        Ok(child) => {
-            println!("OK Server started (PID: {})", child.id());
-            *SERVER_PROCESS.lock().unwrap() = Some(child);
-        }
-        Err(e) => {
-            eprintln!("ERR Failed to start server: {}", e);
-            eprintln!("   Looking for: {:?}", server_path);
-            eprintln!("   Server will not be available, but client will still run");
-        }
-    }
+    Ok(url)
 }
 
 fn stop_server() {
-    if let Ok(mut state) = SERVER_PROCESS.lock() {
-        if let Some(ref mut child) = *state {
-            println!("🛑 Stopping server (PID: {})...", child.id());
-            let _ = child.kill();
-            let _ = child.wait();
-            println!("OK Server stopped");
+    if let Ok(mut state) = SERVER_RUNTIME.lock() {
+        if state.take().is_some() {
+            println!("Server stopped");
         }
-        *state = None;
     }
 }

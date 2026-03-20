@@ -3,9 +3,18 @@ name = "trestle-server"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+name = "trestle_server"
+path = "src/lib.rs"
+
 [[bin]]
 name = "trestle-server"
 path = "src/main.rs"
+required-features = ["binary"]
+
+[features]
+default = []
+binary = []
 
 [dependencies]
 trestle-core = { path = "../core" }
