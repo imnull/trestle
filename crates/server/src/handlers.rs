@@ -244,7 +244,68 @@ pub async fn list_routes(
     Json(routes)
 }
 
-/// GET /api/logs
+/// GET /api/export - 导出所有配置
+pub async fn export_config(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let config = state.config.read().unwrap().clone();
+    let providers = state.providers.read().unwrap().clone();
+    let routes = state.routes.read().unwrap().clone();
+    
+    Json(serde_json::json!({
+        "config": config,
+        "providers": providers,
+        "routes": routes,
+        "exported_at": chrono::Utc::now().to_rfc3339(),
+        "version": env!("CARGO_PKG_VERSION"),
+    }))
+}
+
+/// POST /api/import - 导入配置
+pub async fn import_config(
+    State(state): State<Arc<AppState>>,
+    Json(data): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    // 解析配置
+    let config: Option<trestle_core::Config> = data.get("config")
+        .and_then(|c| serde_json::from_value(c.clone()).ok());
+    
+    let providers: Option<Vec<trestle_core::Provider>> = data.get("providers")
+        .and_then(|p| serde_json::from_value(p.clone()).ok());
+    
+    let routes: Option<Vec<trestle_core::Route>> = data.get("routes")
+        .and_then(|r| serde_json::from_value(r.clone()).ok());
+    
+    // 应用配置
+    let mut applied = Vec::new();
+    
+    if let Some(c) = config {
+        *state.config.write().unwrap() = c;
+        applied.push("config");
+    }
+    
+    if let Some(p) = providers {
+        *state.providers.write().unwrap() = p;
+        applied.push("providers");
+    }
+    
+    if let Some(r) = routes {
+        *state.routes.write().unwrap() = r;
+        applied.push("routes");
+    }
+    
+    if applied.is_empty() {
+        (StatusCode::BAD_REQUEST, Json(serde_json::json!({
+            "success": false,
+            "error": "No valid configuration found in import data"
+        })))
+    } else {
+        (StatusCode::OK, Json(serde_json::json!({
+            "success": true,
+            "imported": applied
+        })))
+    }
+}
 pub async fn get_logs(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {

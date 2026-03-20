@@ -65,6 +65,9 @@ impl ServerRuntime {
             .route("/api/routes/{*pattern}", put(crud::update_route).delete(crud::delete_route))
             // 日志
             .route("/api/logs", get(handlers::get_logs))
+            // 导入导出
+            .route("/api/export", get(handlers::export_config))
+            .route("/api/import", post(handlers::import_config))
             .layer(CorsLayer::permissive())
             .layer(TraceLayer::new_for_http())
             .with_state(state);
