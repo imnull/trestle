@@ -69,19 +69,64 @@ pub async fn anthropic_messages(
 pub async fn list_models(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
-    let providers = state.providers.read().unwrap();
-    let models: Vec<ModelInfo> = providers.iter()
-        .filter(|p| p.enabled)
-        .flat_map(|_p| {
-            // TODO: 从上游获取实际模型列表
-            vec![]
-        })
-        .collect();
-
+    // 尝试从上游获取模型列表
+    let models = fetch_models_from_providers(&state).await;
+    
     Json(serde_json::json!({
         "object": "list",
         "data": models
     }))
+}
+
+async fn fetch_models_from_providers(state: &Arc<AppState>) -> Vec<ModelInfo> {
+    let providers = state.providers.read().unwrap().clone();
+    let mut all_models = Vec::new();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+    
+    for provider in providers.iter().filter(|p| p.enabled) {
+        if let Ok(models) = fetch_provider_models(&state.http_client, &provider).await {
+            all_models.extend(models.into_iter().map(|m| ModelInfo {
+                id: m,
+                object: "model".to_string(),
+                created: now,
+                owned_by: provider.name.clone(),
+            }));
+        }
+    }
+    
+    all_models
+}
+
+async fn fetch_provider_models(client: &reqwest::Client, provider: &trestle_core::Provider) -> Result<Vec<String>, reqwest::Error> {
+    let url = format!("{}/models", provider.base_url.trim_end_matches('/'));
+    
+    let resp = client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(5))
+        .header("Authorization", format!("Bearer {}", provider.api_key.as_deref().unwrap_or("")))
+        .send()
+        .await?;
+    
+    if !resp.status().is_success() {
+        return Ok(Vec::new());
+    }
+    
+    #[derive(serde::Deserialize)]
+    struct ModelsResponse {
+        #[serde(default)]
+        data: Vec<ModelData>,
+    }
+    
+    #[derive(serde::Deserialize)]
+    struct ModelData {
+        id: String,
+    }
+    
+    let models: ModelsResponse = resp.json().await?;
+    Ok(models.data.into_iter().map(|m| m.id).collect())
 }
 
 /// GET /api/status
