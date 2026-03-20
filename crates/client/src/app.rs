@@ -186,7 +186,7 @@ impl eframe::App for TrestleApp {
                 Page::Providers => self.providers.show(ui, &self.api),
                 Page::Routes => self.routes.show(ui, &self.api),
                 Page::Logs => self.logs.show(ui, &self.api),
-                Page::Settings => self.settings.show(ui),
+                Page::Settings => self.settings.show(ui, &self.api),
             }
         });
     }

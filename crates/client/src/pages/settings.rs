@@ -1,8 +1,9 @@
 //! 设置页面
 
 use eframe::egui::{self, Color32, RichText};
+use crate::api::ApiClient;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SettingsPage {
     host: String,
     port: String,
@@ -10,23 +11,40 @@ pub struct SettingsPage {
     language: String,
     auto_start: bool,
     minimize_to_tray: bool,
+    initialized: bool,
+    save_status: Option<String>,
+}
+
+impl Default for SettingsPage {
+    fn default() -> Self {
+        Self {
+            host: "127.0.0.1".to_string(),
+            port: "31415".to_string(),
+            theme: "dark".to_string(),
+            language: "zh-CN".to_string(),
+            auto_start: true,
+            minimize_to_tray: true,
+            initialized: false,
+            save_status: None,
+        }
+    }
 }
 
 impl SettingsPage {
-    pub fn show(&mut self, ui: &mut egui::Ui) {
-        // 初始化默认值
-        if self.host.is_empty() {
-            self.host = "localhost".to_string();
-            self.port = "31415".to_string();
-            self.theme = "system".to_string();
-            self.language = "zh-CN".to_string();
-            self.auto_start = true;
-            self.minimize_to_tray = true;
+    pub fn show(&mut self, ui: &mut egui::Ui, api: &ApiClient) {
+        if !self.initialized {
+            self.load_config(api);
+            self.initialized = true;
         }
 
         ui.vertical(|ui| {
-            ui.label(RichText::new("设置").size(24.0).strong());
+            ui.label(RichText::new("[o] 设置").size(24.0).strong());
             ui.add_space(20.0);
+
+            if let Some(ref status) = self.save_status {
+                ui.label(RichText::new(status).color(Color32::from_rgb(0, 200, 100)));
+                ui.add_space(10.0);
+            }
 
             // 服务配置
             section(ui, "服务配置", |ui| {
@@ -53,8 +71,12 @@ impl SettingsPage {
                     .spacing([20.0, 10.0])
                     .show(ui, |ui| {
                         ui.label("主题:");
-                        egui::ComboBox::from_label("")
-                            .selected_text(&self.theme)
+                        egui::ComboBox::from_id_salt("theme_select")
+                            .selected_text(match self.theme.as_str() {
+                                "light" => "浅色",
+                                "dark" => "深色",
+                                _ => "跟随系统",
+                            })
                             .show_ui(ui, |ui| {
                                 ui.selectable_value(&mut self.theme, "light".to_string(), "浅色");
                                 ui.selectable_value(&mut self.theme, "dark".to_string(), "深色");
@@ -63,7 +85,7 @@ impl SettingsPage {
                         ui.end_row();
 
                         ui.label("语言:");
-                        egui::ComboBox::from_label("")
+                        egui::ComboBox::from_id_salt("lang_select")
                             .selected_text(match self.language.as_str() {
                                 "zh-CN" => "简体中文",
                                 "en-US" => "English",
@@ -90,9 +112,11 @@ impl SettingsPage {
             // 数据管理
             section(ui, "数据管理", |ui| {
                 ui.horizontal(|ui| {
-                    ui.label("配置文件:");
-                    ui.label(RichText::new("~/.config/trestle/config.toml").color(Color32::GRAY));
-                    if ui.small_button("打开目录").clicked() {}
+                    ui.label("配置目录:");
+                    let config_dir = dirs::config_dir()
+                        .map(|p: std::path::PathBuf| p.join("trestle").to_string_lossy().to_string())
+                        .unwrap_or_else(|| "~/.config/trestle".to_string());
+                    ui.label(RichText::new(&config_dir).color(Color32::GRAY));
                 });
             });
 
@@ -100,14 +124,64 @@ impl SettingsPage {
 
             // 操作按钮
             ui.horizontal(|ui| {
-                if ui.button("导出配置").clicked() {}
-                if ui.button("导入配置").clicked() {}
-                if ui.button("重置所有设置").clicked() {}
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("保存").clicked() {}
-                });
+                if ui.button("保存").clicked() {
+                    self.save_config(api);
+                }
+                if ui.button("重新加载").clicked() {
+                    self.initialized = false;
+                    self.save_status = None;
+                }
             });
         });
+    }
+
+    fn load_config(&mut self, api: &ApiClient) {
+        match api.get_config() {
+            Ok(config) => {
+                self.host = config.server.host.clone();
+                self.port = config.server.port.to_string();
+                self.theme = config.ui.theme.clone();
+                self.language = config.ui.language.clone();
+                self.auto_start = config.ui.auto_start;
+                self.minimize_to_tray = config.ui.minimize_to_tray;
+            }
+            Err(e) => {
+                eprintln!("Failed to load config: {}", e);
+            }
+        }
+    }
+
+    fn save_config(&mut self, api: &ApiClient) {
+        let port: u16 = self.port.parse().unwrap_or(31415);
+        
+        let config = trestle_core::Config {
+            server: trestle_core::ServerConfig {
+                host: self.host.clone(),
+                port,
+            },
+            ui: trestle_core::UiConfig {
+                theme: self.theme.clone(),
+                language: self.language.clone(),
+                auto_start: self.auto_start,
+                minimize_to_tray: self.minimize_to_tray,
+            },
+            logging: trestle_core::LoggingConfig::default(),
+        };
+
+        let result: Result<(), anyhow::Error> = (|| {
+            api.update_config(&config)?;
+            api.save_config()?;
+            Ok(())
+        })();
+
+        match result {
+            Ok(_) => {
+                self.save_status = Some("配置已保存".to_string());
+            }
+            Err(e) => {
+                self.save_status = Some(format!("保存失败: {}", e));
+            }
+        }
     }
 }
 
