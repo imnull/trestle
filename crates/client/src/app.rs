@@ -55,14 +55,34 @@ impl TrestleApp {
     fn setup_chinese_fonts(ctx: &egui::Context) {
         let mut fonts = egui::FontDefinitions::default();
 
-        // 尝试加载系统中文字体
-        let chinese_fonts = [
-            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-            "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
-            "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
-            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        ];
+        // 尝试加载系统中文字体（跨平台）
+        let chinese_fonts = if cfg!(target_os = "macos") {
+            // macOS 字体路径
+            vec![
+                "/System/Library/Fonts/PingFang.ttc",
+                "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+                "/System/Library/Fonts/STHeiti Light.ttc",
+                "/System/Library/Fonts/Hiragino Sans GB.ttc",
+                "/Library/Fonts/Arial Unicode.ttf",
+            ]
+        } else if cfg!(target_os = "windows") {
+            // Windows 字体路径
+            vec![
+                "C:\\Windows\\Fonts\\msyh.ttc",      // 微软雅黑
+                "C:\\Windows\\Fonts\\simhei.ttf",    // 黑体
+                "C:\\Windows\\Fonts\\simsun.ttc",    // 宋体
+            ]
+        } else {
+            // Linux 字体路径
+            vec![
+                "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+                "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            ]
+        };
 
+        let mut font_loaded = false;
         for font_path in &chinese_fonts {
             if let Ok(font_data) = std::fs::read(font_path) {
                 fonts.font_data.insert(
@@ -76,16 +96,31 @@ impl TrestleApp {
                     }
                 }
                 println!("Loaded Chinese font from: {}", font_path);
+                font_loaded = true;
                 break;
             }
         }
 
-        // 加载 emoji 字体
-        let emoji_fonts = [
-            "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
-            "/usr/share/fonts/truetype/noto/NotoEmoji-Regular.ttf",
-            "/usr/share/fonts/truetype/twitter-twemoji/Twemoji.ttf",
-        ];
+        if !font_loaded {
+            eprintln!("Warning: No Chinese font found, text may not display correctly");
+        }
+
+        // 加载 emoji 字体（跨平台）
+        let emoji_fonts = if cfg!(target_os = "macos") {
+            vec![
+                "/System/Library/Fonts/Apple Color Emoji.ttc",
+            ]
+        } else if cfg!(target_os = "windows") {
+            vec![
+                "C:\\Windows\\Fonts\\seguiemj.ttf",
+            ]
+        } else {
+            vec![
+                "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+                "/usr/share/fonts/truetype/noto/NotoEmoji-Regular.ttf",
+                "/usr/share/fonts/truetype/twitter-twemoji/Twemoji.ttf",
+            ]
+        };
 
         for font_path in &emoji_fonts {
             if let Ok(font_data) = std::fs::read(font_path) {
