@@ -70,101 +70,16 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
-    strategy:
-      matrix:
-        target: [x86_64-apple-darwin, aarch64-apple-darwin]
     steps:
       - uses: actions/checkout@v4
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
       
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Add Rust targets
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
       
-      - name: Create app bundle
-        run: |
-          mkdir -p Trestle.app/Contents/MacOS
-          mkdir -p Trestle.app/Contents/Resources
-          cp target/${{ matrix.target }}/release/trestle Trestle.app/Contents/MacOS/
-          
-          cat > Trestle.app/Contents/Info.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundleExecutable</key>
-              <string>trestle</string>
-              <key>CFBundleIdentifier</key>
-              <string>ai.trestle.app</string>
-              <key>CFBundleName</key>
-              <string>Trestle</string>
-              <key>CFBundlePackageType</key>
-              <string>APPL</string>
-              <key>CFBundleShortVersionString</key>
-              <string>1.0.0</string>
-              <key>NSHighResolutionCapable</key>
-              <true/>
-          </dict>
-          </plist>
-          EOF
-      
-      - name: Create DMG
-        run: |
-          # 创建临时目录
-          mkdir -p dmg_content
-          cp -R Trestle.app dmg_content/
-          
-          # 创建符号链接到 Applications
-          ln -s /Applications dmg_content/Applications
-          
-          # 设置 DMG 名称
-          if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
-            DMG_NAME="Trestle-macOS-x86_64.dmg"
-          else
-            DMG_NAME="Trestle-macOS-arm64.dmg"
-          fi
-          
-          # 创建 DMG
-          hdiutil create -volname "Trestle" \
-            -srcfolder dmg_content \
-            -ov -format UDZO \
-            $DMG_NAME
-      
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: trestle-${{ matrix.target }}
-          path: "*.dmg"
-
-  build-macos-universal:
-    runs-on: macos-latest
-    needs: [build-macos]
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-apple-darwin,aarch64-apple-darwin
-      
-      - name: Download Intel artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: trestle-x86_64-apple-darwin
-          path: intel
-        continue-on-error: true
-      
-      - name: Download ARM artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: trestle-aarch64-apple-darwin
-          path: arm
-        continue-on-error: true
-      
-      - name: Build universal
+      - name: Build universal binary
         run: |
           cargo build --release --target x86_64-apple-darwin
           cargo build --release --target aarch64-apple-darwin
@@ -202,7 +117,7 @@ jobs:
           </plist>
           EOF
       
-      - name: Create Universal DMG
+      - name: Create DMG
         run: |
           mkdir -p dmg_content
           cp -R Trestle.app dmg_content/
@@ -220,7 +135,7 @@ jobs:
           path: Trestle-macOS-universal.dmg
 
   release:
-    needs: [build-linux, build-windows, build-macos-universal]
+    needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
@@ -230,7 +145,7 @@ jobs:
         uses: actions/download-artifact@v4
       
       - name: List files
-        run: find . -type f -name "*.dmg" -o -name "*.zip" -o -name "*.tar.gz" | head -20
+        run: find . -type f \( -name "*.dmg" -o -name "*.zip" -o -name "*.tar.gz" \) | head -20
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
