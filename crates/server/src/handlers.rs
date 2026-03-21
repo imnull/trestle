@@ -309,6 +309,12 @@ pub async fn import_config(
 pub async fn get_logs(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
-    let logs = state.logs.read().unwrap().clone();
-    Json(logs)
+    // 从 SQLite 获取最近 100 条日志
+    match state.log_store.get_logs(100, 0) {
+        Ok(logs) => Json(logs),
+        Err(e) => {
+            tracing::error!("Failed to get logs from SQLite: {}", e);
+            Json(Vec::new())
+        }
+    }
 }

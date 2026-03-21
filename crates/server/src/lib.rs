@@ -5,6 +5,7 @@ mod handlers;
 mod proxy;
 mod state;
 mod crud;
+mod log_store;
 
 use axum::{
     routing::{get, post, put},

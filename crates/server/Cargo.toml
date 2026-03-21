@@ -37,3 +37,7 @@ config.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 async-stream.workspace = true
+
+# SQLite 日志存储
+rusqlite = { version = "0.32", features = ["bundled"] }
+dirs = "6"

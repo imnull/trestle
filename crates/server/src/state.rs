@@ -6,6 +6,7 @@ use std::sync::RwLock;
 use std::time::Instant;
 use trestle_core::{Config, Provider, RequestLog, Route};
 use chrono::{DateTime, Utc};
+use crate::log_store::LogStore;
 
 /// 健康检查信息
 #[derive(Debug, Clone)]
@@ -19,7 +20,7 @@ pub struct AppState {
     pub config: RwLock<Config>,
     pub providers: RwLock<Vec<Provider>>,
     pub routes: RwLock<Vec<Route>>,
-    pub logs: RwLock<Vec<RequestLog>>,
+    pub log_store: LogStore,
     pub start_time: Instant,
     pub total_requests: AtomicU64,
     pub total_tokens: AtomicU64,
@@ -37,6 +38,11 @@ impl AppState {
             .timeout(std::time::Duration::from_secs(120))
             .build()?;
 
+        // 初始化 SQLite 日志存储
+        let log_path = dirs::data_local_dir()
+            .map(|p| p.join("trestle").join("logs.db"));
+        let log_store = LogStore::new(log_path)?;
+
         tracing::info!("Providers loaded: {:?}", providers.iter().map(|p| &p.name).collect::<Vec<_>>());
         tracing::info!("Routes loaded: {} rules", routes.len());
 
@@ -44,7 +50,7 @@ impl AppState {
             config: RwLock::new(config),
             providers: RwLock::new(providers),
             routes: RwLock::new(routes),
-            logs: RwLock::new(Vec::new()),
+            log_store,
             start_time: Instant::now(),
             total_requests: AtomicU64::new(0),
             total_tokens: AtomicU64::new(0),
@@ -62,10 +68,9 @@ impl AppState {
     }
 
     pub fn add_log(&self, log: RequestLog) {
-        let mut logs = self.logs.write().unwrap();
-        logs.push(log);
-        if logs.len() > 10000 {
-            logs.drain(0..1000);
+        // 写入 SQLite
+        if let Err(e) = self.log_store.add_log(&log) {
+            tracing::error!("Failed to write log to SQLite: {}", e);
         }
     }
 
