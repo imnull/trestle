@@ -5027,7 +5027,7 @@ dependencies = [
 
 [[package]]
 name = "trestle-client"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5050,7 +5050,7 @@ dependencies = [
 
 [[package]]
 name = "trestle-core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5065,7 +5065,7 @@ dependencies = [
 
 [[package]]
 name = "trestle-server"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-stream",

@@ -1,5 +1,7 @@
 [workspace]
-members = ["crates/server", "crates/client", "crates/core"]
+members = ["crates/server", "crates/core", "src-tauri"]
+# 旧的 egui 客户端保留但不再默认构建
+# members = ["crates/server", "crates/client", "crates/core"]
 resolver = "2"
 
 [workspace.package]
