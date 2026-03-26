@@ -1,7 +1,8 @@
-//! 路由规则页面
+//! 路由规则页面 - 现代化设计
 
 use eframe::egui::{self, Color32, RichText};
 use crate::api::{ApiClient, Provider};
+use crate::ui_theme::{self, colors, spacing, icons, card_frame, primary_button, secondary_button, danger_button};
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Default)]
@@ -13,6 +14,7 @@ pub struct RoutesPage {
     editing_pattern: Option<String>,
     form: RouteForm,
     error_message: Option<String>,
+    show_delete_confirm: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -31,63 +33,129 @@ impl RoutesPage {
         }
 
         ui.vertical(|ui| {
+            // 工具栏
             ui.horizontal(|ui| {
-                ui.label(RichText::new("[>] 路由规则").size(24.0).strong());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("添加").clicked() {
+                    if primary_button(ui, &format!("{} 添加", icons::ADD)).clicked() {
                         self.open_add_dialog();
                     }
-                    if ui.button("刷新").clicked() {
+                    ui.add_space(spacing::SM);
+                    if secondary_button(ui, &format!("{} 刷新", icons::REFRESH)).clicked() {
                         self.loaded = false;
                     }
                 });
             });
-            ui.add_space(20.0);
+            
+            ui.add_space(spacing::SM);
+            
+            // 提示信息
+            card_frame().show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(icons::INFO)
+                            .size(14.0)
+                    );
+                    ui.add_space(spacing::SM);
+                    ui.label(
+                        RichText::new("使用 * 作为通配符，例如 gpt-4* 匹配所有 gpt-4 开头的模型")
+                            .size(11.0)
+                            .color(colors::TEXT_SECONDARY)
+                    );
+                });
+            });
+            
+            ui.add_space(spacing::MD);
 
+            // 错误提示
             if let Some(ref err) = self.error_message {
-                ui.label(RichText::new(format!("错误: {}", err)).color(Color32::RED));
-                ui.add_space(10.0);
+                card_frame().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new(icons::ERROR)
+                                .size(18.0)
+                        );
+                        ui.add_space(spacing::SM);
+                        ui.label(
+                            RichText::new(err)
+                                .size(13.0)
+                                .color(colors::ERROR)
+                        );
+                    });
+                });
+                ui.add_space(spacing::MD);
             }
 
-            // 表头
-            egui::Frame::none()
-                .fill(Color32::from_rgb(35, 35, 35))
-                .rounding(3.0)
-                .inner_margin(8.0)
-                .show(ui, |ui| {
+            // 路由列表
+            let routes = self.routes.lock().unwrap().clone();
+            
+            if routes.is_empty() {
+                ui_theme::empty_state(
+                    ui,
+                    icons::ROUTES,
+                    "暂无路由规则",
+                    "点击右上角「添加」按钮创建第一个路由规则"
+                );
+            } else {
+                // 表头
+                card_frame().show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.set_min_width(ui.available_width());
-                        ui.label(RichText::new("优先级").strong().size(12.0));
-                        ui.label(RichText::new("匹配规则").strong().size(12.0));
-                        ui.label(RichText::new("服务商").strong().size(12.0));
-                        ui.label(RichText::new("目标模型").strong().size(12.0));
-                        ui.label(RichText::new("操作").strong().size(12.0));
+                        
+                        ui.allocate_ui_with_layout(
+                            egui::Vec2::new(60.0, 20.0),
+                            egui::Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                ui.label(RichText::new("优先级").strong().size(12.0).color(colors::TEXT_SECONDARY));
+                            }
+                        );
+                        
+                        ui.allocate_ui_with_layout(
+                            egui::Vec2::new(150.0, 20.0),
+                            egui::Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                ui.label(RichText::new("匹配规则").strong().size(12.0).color(colors::TEXT_SECONDARY));
+                            }
+                        );
+                        
+                        ui.allocate_ui_with_layout(
+                            egui::Vec2::new(120.0, 20.0),
+                            egui::Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                ui.label(RichText::new("服务商").strong().size(12.0).color(colors::TEXT_SECONDARY));
+                            }
+                        );
+                        
+                        ui.allocate_ui_with_layout(
+                            egui::Vec2::new(150.0, 20.0),
+                            egui::Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                ui.label(RichText::new("目标模型").strong().size(12.0).color(colors::TEXT_SECONDARY));
+                            }
+                        );
+                        
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(RichText::new("操作").strong().size(12.0).color(colors::TEXT_SECONDARY));
+                        });
                     });
                 });
 
-            ui.add_space(5.0);
+                ui.add_space(spacing::SM);
 
-            let routes = self.routes.lock().unwrap().clone();
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                for route in &routes {
-                    self.route_row(ui, api, route);
-                    ui.add_space(3.0);
-                }
-
-                if routes.is_empty() {
-                    ui.centered_and_justified(|ui| {
-                        ui.vertical(|ui| {
-                            ui.label(RichText::new("暂无路由规则").color(Color32::GRAY));
-                            ui.add_space(10.0);
-                            ui.label(RichText::new("点击上方按钮添加").color(Color32::GRAY));
-                        });
-                    });
-                }
-            });
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    for route in &routes {
+                        self.route_row(ui, api, route);
+                        ui.add_space(spacing::SM);
+                    }
+                });
+            }
         });
 
         if self.dialog_open {
             self.show_dialog(ui, api);
+        }
+        
+        if let Some(ref pattern) = self.show_delete_confirm {
+            self.show_delete_confirm_dialog(ui, api, pattern.clone());
         }
     }
 
@@ -173,95 +241,181 @@ impl RoutesPage {
         }
     }
 
-    fn route_row(&mut self,
-        ui: &mut egui::Ui,
-        api: &ApiClient,
-        route: &crate::api::Route,
-    ) {
-        egui::Frame::none()
-            .fill(Color32::from_rgb(40, 40, 40))
-            .rounding(3.0)
-            .inner_margin(8.0)
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.set_min_width(ui.available_width());
-                    
-                    ui.label(RichText::new(route.priority.to_string()).size(12.0));
-                    ui.label(RichText::new(&route.pattern).code().size(12.0));
-                    ui.label(RichText::new(&route.provider).size(12.0));
-                    ui.label(RichText::new(route.model.as_deref().unwrap_or("(原样)")).size(12.0).color(Color32::GRAY));
-                    
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.small_button("删除").clicked() {
-                            self.delete_route(api, &route.pattern);
-                        }
-                        if ui.small_button("编辑").clicked() {
-                            self.open_edit_dialog(route);
-                        }
-                    });
+    fn route_row(&mut self, ui: &mut egui::Ui, api: &ApiClient, route: &crate::api::Route) {
+        card_frame().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.set_min_width(ui.available_width());
+                
+                ui.allocate_ui_with_layout(
+                    egui::Vec2::new(60.0, 20.0),
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        ui_theme::badge(ui, &route.priority.to_string(), colors::PRIMARY);
+                    }
+                );
+                
+                ui.allocate_ui_with_layout(
+                    egui::Vec2::new(150.0, 20.0),
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        ui.label(
+                            RichText::new(&route.pattern)
+                                .size(13.0)
+                                .code()
+                                .color(colors::TEXT_PRIMARY)
+                        );
+                    }
+                );
+                
+                ui.allocate_ui_with_layout(
+                    egui::Vec2::new(120.0, 20.0),
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        ui.label(
+                            RichText::new(&route.provider)
+                                .size(13.0)
+                                .color(colors::TEXT_PRIMARY)
+                        );
+                    }
+                );
+                
+                ui.allocate_ui_with_layout(
+                    egui::Vec2::new(150.0, 20.0),
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        let model_text = route.model.as_deref().unwrap_or("(原样)");
+                        ui.label(
+                            RichText::new(model_text)
+                                .size(13.0)
+                                .color(if route.model.is_none() { colors::TEXT_MUTED } else { colors::TEXT_PRIMARY })
+                        );
+                    }
+                );
+                
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if danger_button(ui, &format!("{} 删除", icons::DELETE)).clicked() {
+                        self.show_delete_confirm = Some(route.pattern.clone());
+                    }
+                    ui.add_space(spacing::SM);
+                    if secondary_button(ui, &format!("{} 编辑", icons::EDIT)).clicked() {
+                        self.open_edit_dialog(route);
+                    }
                 });
             });
+        });
     }
 
-    fn show_dialog(&mut self,
-        ui: &mut egui::Ui,
-        _api: &ApiClient,
-    ) {
+    fn show_dialog(&mut self, ui: &mut egui::Ui, _api: &ApiClient) {
         let title = if self.editing_pattern.is_some() {
-            "编辑路由"
+            format!("{} 编辑路由", icons::EDIT)
         } else {
-            "添加路由"
+            format!("{} 添加路由", icons::ADD)
         };
 
         egui::Window::new(title)
             .collapsible(false)
             .resizable(false)
+            .fixed_size([500.0, 420.0])
             .show(ui.ctx(), |ui| {
-                ui.set_min_width(400.0);
+                ui.set_min_width(480.0);
 
                 if let Some(ref err) = self.error_message {
-                    ui.label(RichText::new(err).color(Color32::RED));
-                    ui.add_space(10.0);
+                    card_frame().show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                RichText::new(icons::ERROR)
+                                    .size(16.0)
+                            );
+                            ui.add_space(spacing::SM);
+                            ui.label(
+                                RichText::new(err)
+                                    .color(colors::ERROR)
+                                    .size(13.0)
+                            );
+                        });
+                    });
+                    ui.add_space(spacing::MD);
                 }
 
-                egui::Grid::new("route_form")
-                    .num_columns(2)
-                    .spacing([10.0, 10.0])
-                    .show(ui, |ui| {
-                        ui.label("匹配规则:");
-                        ui.text_edit_singleline(&mut self.form.pattern);
-                        ui.end_row();
+                ui.vertical(|ui| {
+                    // 匹配规则
+                    ui.label(
+                        RichText::new("匹配规则 *")
+                            .size(13.0)
+                            .strong()
+                            .color(colors::TEXT_PRIMARY)
+                    );
+                    ui.add_space(spacing::XS);
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.form.pattern)
+                            .hint_text("例如: gpt-4*、claude-*")
+                            .desired_width(400.0)
+                    );
+                    ui.add_space(spacing::SM);
+                    ui.label(
+                        RichText::new("使用 * 作为通配符匹配任意字符")
+                            .size(11.0)
+                            .color(colors::TEXT_MUTED)
+                    );
+                    ui.add_space(spacing::MD);
+                    
+                    // 服务商
+                    ui.label(
+                        RichText::new("目标服务商 *")
+                            .size(13.0)
+                            .strong()
+                            .color(colors::TEXT_PRIMARY)
+                    );
+                    ui.add_space(spacing::XS);
+                    let providers = self.providers.lock().unwrap();
+                    egui::ComboBox::from_id_salt("provider_select")
+                        .selected_text(&self.form.provider)
+                        .width(400.0)
+                        .show_ui(ui, |ui| {
+                            for p in providers.iter() {
+                                ui.selectable_value(&mut self.form.provider, p.name.clone(), &p.name);
+                            }
+                        });
+                    ui.add_space(spacing::MD);
+                    
+                    // 目标模型
+                    ui.label(
+                        RichText::new("目标模型")
+                            .size(13.0)
+                            .strong()
+                            .color(colors::TEXT_PRIMARY)
+                    );
+                    ui.add_space(spacing::XS);
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.form.model)
+                            .hint_text("留空表示使用请求中的原始模型名")
+                            .desired_width(400.0)
+                    );
+                    ui.add_space(spacing::MD);
+                    
+                    // 优先级
+                    ui.label(
+                        RichText::new("优先级 *")
+                            .size(13.0)
+                            .strong()
+                            .color(colors::TEXT_PRIMARY)
+                    );
+                    ui.add_space(spacing::XS);
+                    ui.add(
+                        egui::Slider::new(&mut self.form.priority, 1..=100)
+                            .text("数值越小优先级越高")
+                    );
+                });
 
-                        ui.label("服务商:");
-                        let providers = self.providers.lock().unwrap();
-                        egui::ComboBox::from_id_salt("provider_select")
-                            .selected_text(&self.form.provider)
-                            .show_ui(ui, |ui| {
-                                for p in providers.iter() {
-                                    ui.selectable_value(&mut self.form.provider, p.name.clone(), &p.name);
-                                }
-                            });
-                        ui.end_row();
-
-                        ui.label("目标模型:");
-                        ui.text_edit_singleline(&mut self.form.model);
-                        ui.end_row();
-
-                        ui.label("优先级:");
-                        ui.add(egui::DragValue::new(&mut self.form.priority).range(1..=100));
-                        ui.end_row();
-                    });
-
-                ui.add_space(10.0);
-                ui.label(RichText::new("提示: 模型留空表示使用请求中的原始模型名").color(Color32::GRAY).size(11.0));
-
-                ui.add_space(20.0);
-                ui.horizontal(|ui| {
-                    if ui.button("取消").clicked() {
+                ui.add_space(spacing::XL);
+                
+                ui.horizontal_centered(|ui| {
+                    if secondary_button(ui, &format!("{} 取消", icons::CANCEL)).clicked() {
                         self.dialog_open = false;
                         self.error_message = None;
                     }
-                    if ui.button("保存").clicked() {
+                    ui.add_space(spacing::MD);
+                    if primary_button(ui, &format!("{} 保存", icons::SAVE)).clicked() {
                         if self.form.pattern.is_empty() {
                             self.error_message = Some("匹配规则不能为空".to_string());
                         } else if self.form.provider.is_empty() {
@@ -270,6 +424,53 @@ impl RoutesPage {
                             self.save_route(_api);
                         }
                     }
+                });
+            });
+    }
+    
+    fn show_delete_confirm_dialog(&mut self, ui: &mut egui::Ui, api: &ApiClient, pattern: String) {
+        egui::Window::new(format!("{} 确认删除", icons::WARNING))
+            .collapsible(false)
+            .resizable(false)
+            .fixed_size([350.0, 200.0])
+            .show(ui.ctx(), |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(spacing::LG);
+                    
+                    ui.label(
+                        RichText::new(icons::WARNING)
+                            .size(32.0)
+                    );
+                    
+                    ui.add_space(spacing::MD);
+                    
+                    ui.label(
+                        RichText::new(format!("确定要删除路由规则「{}」吗？", pattern))
+                            .size(14.0)
+                            .strong()
+                            .color(colors::TEXT_PRIMARY)
+                    );
+                    
+                    ui.add_space(spacing::SM);
+                    
+                    ui.label(
+                        RichText::new("此操作不可撤销")
+                            .size(12.0)
+                            .color(colors::TEXT_MUTED)
+                    );
+                    
+                    ui.add_space(spacing::XL);
+                    
+                    ui.horizontal(|ui| {
+                        if secondary_button(ui, "取消").clicked() {
+                            self.show_delete_confirm = None;
+                        }
+                        ui.add_space(spacing::MD);
+                        if danger_button(ui, &format!("{} 删除", icons::DELETE)).clicked() {
+                            self.delete_route(api, &pattern);
+                            self.show_delete_confirm = None;
+                        }
+                    });
                 });
             });
     }

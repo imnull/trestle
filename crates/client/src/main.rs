@@ -3,6 +3,7 @@
 mod app;
 mod pages;
 mod api;
+mod ui_theme;
 
 use std::sync::Mutex;
 use std::time::Duration;

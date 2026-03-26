@@ -4,41 +4,34 @@
 
 ## 技术栈
 
-- **前端**: Vite + React 18 + TypeScript + Tailwind CSS
-- **后端**: Tauri 2.0 + Rust
-- **状态管理**: Zustand
+- **GUI**: egui (Rust)
+- **后端**: Axum + Tokio
+- **架构**: 单机应用（内嵌 HTTP 服务）
 
 ## 开发
 
 ```bash
-# 安装依赖
-npm install
-
-# 开发模式 (需要 Tauri 环境)
-npm run tauri dev
-
 # 构建
-npm run tauri build
+cargo build --release
+
+# 运行
+cargo run --release -p trestle-client
+
+# 或者直接运行二进制文件
+./target/release/trestle
 ```
 
 ## 项目结构
 
 ```
 trestle/
-├── src/                    # 前端源码
-│   ├── components/         # UI 组件
-│   ├── pages/              # 页面组件
-│   ├── stores/             # Zustand stores
-│   └── lib/                # 工具函数
-├── src-tauri/              # Tauri 后端
-│   └── src/
-│       ├── main.rs         # 入口
-│       ├── lib.rs          # 主逻辑
-│       ├── commands.rs     # Tauri 命令
-│       └── tray.rs         # 系统托盘
-└── crates/                 # Rust crates
-    ├── core/               # 共享类型和逻辑
-    └── server/             # 内嵌 HTTP 服务
+├── crates/
+│   ├── core/           # 共享类型和配置
+│   ├── server/         # HTTP 服务 (Axum)
+│   └── client/         # GUI 应用 (egui)
+├── config.example.toml # 配置示例
+├── providers.example.toml
+└── routes.example.toml
 ```
 
 ## 功能
@@ -46,5 +39,9 @@ trestle/
 - ✅ 服务商管理 (OpenAI, Claude, 等)
 - ✅ 路由规则配置
 - ✅ 请求日志查看
-- ✅ 系统托盘支持
+- ✅ 单机运行，无需额外服务
 - ✅ 跨平台 (Windows, macOS, Linux)
+
+## 运行原理
+
+应用启动时会自动启动内嵌 HTTP 服务（默认端口 31415），GUI 通过本地 API 与服务通信。同时提供 OpenAI 兼容的 API 端点供外部使用。
